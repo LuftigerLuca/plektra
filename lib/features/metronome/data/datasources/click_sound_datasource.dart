@@ -1,4 +1,5 @@
 import 'package:flutter_soloud/flutter_soloud.dart';
+import 'package:plektra/features/metronome/domain/entities/beat_mode.dart';
 
 class ClickSoundDataSource {
   final SoLoud _soloud = SoLoud.instance;
@@ -6,7 +7,7 @@ class ClickSoundDataSource {
   AudioSource? _normalSound;
 
   Future<void> init() async {
-    if(!_soloud.isInitialized) {
+    if (!_soloud.isInitialized) {
       await _soloud.init();
     }
 
@@ -14,8 +15,9 @@ class ClickSoundDataSource {
     _normalSound ??= await _soloud.loadAsset("assets/sounds/click_normal.wav");
   }
 
-  Future<void> playClick({required bool isAccented}) async {
-    final sound = isAccented ? _accentSound : _normalSound;
+  Future<void> playClick({required BeatMode mode}) async {
+    if (mode == BeatMode.muted) return;
+    final sound = mode == BeatMode.accent ? _accentSound : _normalSound;
     if (sound != null) {
       _soloud.play(sound);
     }

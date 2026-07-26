@@ -3,8 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:plektra/core/di/service_locator.dart';
 import 'package:plektra/core/theme/app_colors.dart';
 import 'package:plektra/core/theme/app_text_styles.dart';
+import 'package:plektra/features/metronome/domain/entities/beat_mode.dart';
 import 'package:plektra/features/metronome/domain/entities/beat_pattern.dart';
 import 'package:plektra/features/metronome/domain/entities/note_value.dart';
+import 'package:plektra/features/metronome/domain/services/accent_rules.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../bloc/metronome_bloc.dart';
 import '../bloc/metronome_event.dart';
@@ -36,13 +38,12 @@ class _MetronomeView extends StatelessWidget {
               final pattern = _patternFromState(state);
               final isRunning = state is MetronomeRunning;
               final currentBeat = isRunning ? state.currentBeat : 0;
-              final beatsPerBar = pattern.beatsPerBar;
 
               return Column(
                 children: [
                   const SizedBox(height: 32),
                   _BeatDots(
-                    beatsPerBar: beatsPerBar,
+                    pattern: pattern,
                     currentBeat: currentBeat,
                     isRunning: isRunning,
                   ),
@@ -50,6 +51,8 @@ class _MetronomeView extends StatelessWidget {
                   _BpmInput(bpm: pattern.bpm),
                   const SizedBox(height: 40),
                   _SettingsCard(pattern: pattern),
+                  const SizedBox(height: 40),
+                  _BeatModeEditor(pattern: pattern),
                   const Spacer(),
                   _StartStopButton(isRunning: isRunning, pattern: pattern),
                   const SizedBox(height: 24),
@@ -63,25 +66,18 @@ class _MetronomeView extends StatelessWidget {
   }
 
   BeatPattern _patternFromState(MetronomeState state) {
-    if (state is MetronomeRunning) {
-      return BeatPattern(
-        bpm: state.bpm,
-        beatsPerBar: state.beatsPerBar,
-        noteValue: state.noteValue,
-      );
-    }
     if (state is MetronomeIdle) return state.pattern;
     return const BeatPattern(bpm: 120, beatsPerBar: 4);
   }
 }
 
 class _BeatDots extends StatelessWidget {
-  final int beatsPerBar;
+  final BeatPattern pattern;
   final int currentBeat;
   final bool isRunning;
 
   const _BeatDots({
-    required this.beatsPerBar,
+    required this.pattern,
     required this.currentBeat,
     required this.isRunning,
   });
@@ -90,16 +86,16 @@ class _BeatDots extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(beatsPerBar, (index) {
+      children: List.generate(pattern.beatsPerBar, (index) {
         final beatNumber = index + 1;
         final isActive = isRunning && currentBeat == beatNumber;
-        final isAccent = beatNumber == 1;
+        final mode = AccentRules.resolve(beatNumber, pattern);
 
         return Padding(
-          padding: EdgeInsets.only(right: index < beatsPerBar - 1 ? 12 : 0),
+          padding: EdgeInsets.only(right: index < pattern.beatsPerBar - 1 ? 12 : 0),
           child: _BeatDot(
             isActive: isActive,
-            isAccent: isAccent,
+            mode: mode,
           ),
         );
       }),
@@ -109,18 +105,21 @@ class _BeatDots extends StatelessWidget {
 
 class _BeatDot extends StatelessWidget {
   final bool isActive;
-  final bool isAccent;
+  final BeatMode mode;
 
-  const _BeatDot({required this.isActive, required this.isAccent});
+  const _BeatDot({required this.isActive, required this.mode});
 
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
 
     if (isActive) {
-      final color = isAccent ? AppColors.success : theme.colorScheme.primary;
-      final borderColor =
-          isAccent ? AppColors.successBorder : theme.colorScheme.muted;
+      final color = mode == BeatMode.accent
+          ? AppColors.success
+          : theme.colorScheme.primary;
+      final borderColor = mode == BeatMode.accent
+          ? AppColors.successBorder
+          : theme.colorScheme.muted;
       return AnimatedContainer(
         duration: const Duration(milliseconds: 60),
         width: 25,
@@ -136,12 +135,29 @@ class _BeatDot extends StatelessWidget {
       );
     }
 
+    if (mode == BeatMode.muted) {
+      return Container(
+        width: 18,
+        height: 18,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: AppColors.disabled,
+            width: 1.5,
+            style: BorderStyle.solid,
+          ),
+        ),
+      );
+    }
+
     return Container(
       width: 18,
       height: 18,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: AppColors.disabled,
+        color: mode == BeatMode.accent
+            ? AppColors.primary.withAlpha(60)
+            : AppColors.disabled,
       ),
     );
   }
@@ -416,6 +432,154 @@ class _NoteValuePills extends StatelessWidget {
             ),
           );
         }),
+      ),
+    );
+  }
+}
+
+class _BeatModeEditor extends StatelessWidget {
+  final BeatPattern pattern;
+
+  const _BeatModeEditor({required this.pattern});
+
+  static const _modeOrder = [BeatMode.normal, BeatMode.accent, BeatMode.muted];
+
+  BeatMode _nextMode(BeatMode current) {
+    final idx = _modeOrder.indexOf(current);
+    return _modeOrder[(idx + 1) % _modeOrder.length];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bloc = context.read<MetronomeBloc>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'BEAT-MODI',
+          style: AppTextStyles.cardTitle.copyWith(
+            color: AppColors.mutedForegroundDim,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: List.generate(pattern.beatsPerBar, (index) {
+            final beatNumber = index + 1;
+            final mode = AccentRules.resolve(beatNumber, pattern);
+
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  right: index < pattern.beatsPerBar - 1 ? 8 : 0,
+                ),
+                child: GestureDetector(
+                  onTap: () => bloc.add(
+                    MetronomeBeatModeChanged(beatNumber, _nextMode(mode)),
+                  ),
+                  child: _BeatModeDot(beatNumber: beatNumber, mode: mode),
+                ),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _modeLegend(AppColors.disabled, 'NORMAL'),
+            const SizedBox(width: 16),
+            _modeLegend(AppColors.primary, 'AKZENT'),
+            const SizedBox(width: 16),
+            _modeLegend(null, 'STUMM'),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _modeLegend(Color? color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (color != null)
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color,
+            ),
+          )
+        else
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppColors.disabled,
+                width: 1.5,
+              ),
+            ),
+          ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: AppTextStyles.sectionLabel.copyWith(
+            color: AppColors.mutedForegroundDim,
+            fontSize: 9,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BeatModeDot extends StatelessWidget {
+  final int beatNumber;
+  final BeatMode mode;
+
+  const _BeatModeDot({required this.beatNumber, required this.mode});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+
+    Color backgroundColor;
+    Color borderColor;
+    Color textColor;
+
+    switch (mode) {
+      case BeatMode.accent:
+        backgroundColor = AppColors.primary;
+        borderColor = AppColors.primary;
+        textColor = AppColors.primaryForeground;
+      case BeatMode.normal:
+        backgroundColor = AppColors.disabled;
+        borderColor = AppColors.disabled;
+        textColor = theme.colorScheme.mutedForeground;
+      case BeatMode.muted:
+        backgroundColor = Colors.transparent;
+        borderColor = AppColors.disabled;
+        textColor = AppColors.disabled;
+    }
+
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(11),
+        color: backgroundColor,
+        border: Border.all(color: borderColor, width: 1.5),
+      ),
+      child: Center(
+        child: Text(
+          '$beatNumber',
+          style: AppTextStyles.valueText.copyWith(
+            fontSize: 14,
+            color: textColor,
+          ),
+        ),
       ),
     );
   }

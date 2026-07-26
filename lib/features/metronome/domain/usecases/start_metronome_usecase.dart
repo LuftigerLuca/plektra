@@ -10,9 +10,9 @@ class StartMetronomeUsecase {
   Stream<BeatEvent> call(BeatPattern pattern) {
     return repository.start(pattern).map((beatNumber) {
       return BeatEvent(
-        beatNumber: beatNumber, 
-        isAccented: AccentRules.isAccentedBeat(beatNumber, pattern),
-        );
+        beatNumber: beatNumber,
+        mode: AccentRules.resolve(beatNumber, pattern),
+      );
     });
   }
 }

@@ -1,3 +1,4 @@
+import 'package:plektra/features/metronome/domain/entities/beat_mode.dart';
 import 'package:plektra/features/metronome/domain/entities/beat_pattern.dart';
 import 'package:plektra/features/metronome/domain/entities/note_value.dart';
 
@@ -23,4 +24,10 @@ class MetronomePatternChanged extends MetronomeEvent {
 class MetronomeNoteValueChanged extends MetronomeEvent {
   final NoteValue noteValue;
   MetronomeNoteValueChanged(this.noteValue);
+}
+
+class MetronomeBeatModeChanged extends MetronomeEvent {
+  final int beatNumber;
+  final BeatMode mode;
+  MetronomeBeatModeChanged(this.beatNumber, this.mode);
 }

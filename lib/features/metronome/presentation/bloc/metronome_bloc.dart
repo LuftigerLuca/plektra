@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:plektra/features/metronome/domain/entities/beat_mode.dart';
 import 'package:plektra/features/metronome/domain/entities/beat_pattern.dart';
 import 'package:plektra/features/metronome/presentation/bloc/metronome_event.dart';
 import 'package:plektra/features/metronome/presentation/bloc/metronome_state.dart';
@@ -24,6 +25,7 @@ class MetronomeBloc extends Bloc<MetronomeEvent, MetronomeState> {
     on<MetronomeBpmChanged>(_onBpmChanged);
     on<MetronomePatternChanged>(_onPatternChanged);
     on<MetronomeNoteValueChanged>(_onNoteValueChanged);
+    on<MetronomeBeatModeChanged>(_onBeatModeChanged);
   }
 
   Future<void> _onStarted(
@@ -35,11 +37,9 @@ class MetronomeBloc extends Bloc<MetronomeEvent, MetronomeState> {
     await emit.forEach(
       startMetronome(event.pattern),
       onData: (data) => MetronomeRunning(
+        pattern: _currentPattern,
         currentBeat: data.beatNumber,
-        isAccented: data.isAccented,
-        bpm: _currentPattern.bpm,
-        beatsPerBar: _currentPattern.beatsPerBar,
-        noteValue: _currentPattern.noteValue,
+        currentMode: data.mode,
       ),
       onError: (error, stackTrace) => MetronomeError(error.toString()),
     );
@@ -82,6 +82,21 @@ class MetronomeBloc extends Bloc<MetronomeEvent, MetronomeState> {
     Emitter<MetronomeState> emit,
   ) async {
     final newPattern = _currentPattern.copyWith(noteValue: event.noteValue);
+    _currentPattern = newPattern;
+    if (state is MetronomeRunning) {
+      add(MetronomeStarted(newPattern));
+    } else {
+      emit(MetronomeIdle(pattern: _currentPattern));
+    }
+  }
+
+  Future<void> _onBeatModeChanged(
+    MetronomeBeatModeChanged event,
+    Emitter<MetronomeState> emit,
+  ) async {
+    final newModes = Map<int, BeatMode>.from(_currentPattern.beatModes);
+    newModes[event.beatNumber] = event.mode;
+    final newPattern = _currentPattern.copyWith(beatModes: newModes);
     _currentPattern = newPattern;
     if (state is MetronomeRunning) {
       add(MetronomeStarted(newPattern));

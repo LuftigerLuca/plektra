@@ -1,6 +1,8 @@
+import 'package:plektra/features/metronome/domain/entities/beat_mode.dart';
+
 class BeatEvent {
   final int beatNumber;
-  final bool isAccented;
+  final BeatMode mode;
 
-  const BeatEvent({required this.beatNumber, required this.isAccented});
+  const BeatEvent({required this.beatNumber, required this.mode});
 }

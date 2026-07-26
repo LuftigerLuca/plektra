@@ -8,7 +8,7 @@ class MetronomeRepositoryImpl implements MetronomeRepository {
   bool _isRunning = false;
 
   MetronomeRepositoryImpl(this._clickSoundDataSource);
-  
+
   @override
   Stream<int> start(BeatPattern pattern) async* {
     await _clickSoundDataSource.init();
@@ -18,9 +18,9 @@ class MetronomeRepositoryImpl implements MetronomeRepository {
     var currentBeat = 1;
     var nextTick = DateTime.now();
 
-    while(_isRunning) {
-      final isAccented = AccentRules.isAccentedBeat(currentBeat, pattern);
-      await _clickSoundDataSource.playClick(isAccented: isAccented);
+    while (_isRunning) {
+      final mode = AccentRules.resolve(currentBeat, pattern);
+      await _clickSoundDataSource.playClick(mode: mode);
       yield currentBeat;
 
       nextTick = nextTick.add(Duration(milliseconds: intervalMs));
