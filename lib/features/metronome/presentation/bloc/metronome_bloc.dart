@@ -3,20 +3,17 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:plektra/features/metronome/domain/entities/beat_mode.dart';
 import 'package:plektra/features/metronome/domain/entities/beat_pattern.dart';
+import 'package:plektra/features/metronome/domain/repositories/metronome_repository.dart';
 import 'package:plektra/features/metronome/presentation/bloc/metronome_event.dart';
 import 'package:plektra/features/metronome/presentation/bloc/metronome_state.dart';
-import 'package:plektra/features/metronome/domain/usecases/start_metronome_usecase.dart';
 
 class MetronomeBloc extends Bloc<MetronomeEvent, MetronomeState> {
-  final StartMetronomeUsecase startMetronome;
+  final MetronomeRepository _repository;
   BeatPattern _currentPattern;
   StreamSubscription? _subscription;
 
-  MetronomeBloc(this.startMetronome)
-      : _currentPattern = const BeatPattern(
-            bpm: 120,
-            beatsPerBar: 4,
-          ),
+  MetronomeBloc(this._repository)
+      : _currentPattern = const BeatPattern(bpm: 120, beatsPerBar: 4),
         super(MetronomeIdle(
           pattern: const BeatPattern(bpm: 120, beatsPerBar: 4),
         )) {
@@ -26,6 +23,8 @@ class MetronomeBloc extends Bloc<MetronomeEvent, MetronomeState> {
     on<MetronomePatternChanged>(_onPatternChanged);
     on<MetronomeNoteValueChanged>(_onNoteValueChanged);
     on<MetronomeBeatModeChanged>(_onBeatModeChanged);
+    on<_MetronomeTick>(_onTick);
+    on<MetronomeErrorEvent>(_onError);
   }
 
   Future<void> _onStarted(
@@ -34,15 +33,25 @@ class MetronomeBloc extends Bloc<MetronomeEvent, MetronomeState> {
   ) async {
     _currentPattern = event.pattern;
     await _subscription?.cancel();
-    await emit.forEach(
-      startMetronome(event.pattern),
-      onData: (data) => MetronomeRunning(
-        pattern: _currentPattern,
-        currentBeat: data.beatNumber,
-        currentMode: data.mode,
-      ),
-      onError: (error, stackTrace) => MetronomeError(error.toString()),
+    _subscription = _repository.start(event.pattern).listen(
+      (data) => add(_MetronomeTick(data.beatNumber, data.mode)),
+      onError: (error) {
+        add(MetronomeStopped());
+        add(MetronomeErrorEvent(error.toString()));
+      },
     );
+  }
+
+  void _onTick(_MetronomeTick event, Emitter<MetronomeState> emit) {
+    emit(MetronomeRunning(
+      pattern: _currentPattern,
+      currentBeat: event.beatNumber,
+      currentMode: event.mode,
+    ));
+  }
+
+  void _onError(MetronomeErrorEvent event, Emitter<MetronomeState> emit) {
+    emit(MetronomeError(event.message));
   }
 
   Future<void> _onStopped(
@@ -110,4 +119,10 @@ class MetronomeBloc extends Bloc<MetronomeEvent, MetronomeState> {
     _subscription?.cancel();
     return super.close();
   }
+}
+
+class _MetronomeTick extends MetronomeEvent {
+  final int beatNumber;
+  final BeatMode mode;
+  _MetronomeTick(this.beatNumber, this.mode);
 }

@@ -1,4 +1,5 @@
 import 'package:plektra/features/metronome/data/datasources/click_sound_datasource.dart';
+import 'package:plektra/features/metronome/domain/entities/beat_event.dart';
 import 'package:plektra/features/metronome/domain/entities/beat_pattern.dart';
 import 'package:plektra/features/metronome/domain/repositories/metronome_repository.dart';
 import 'package:plektra/features/metronome/domain/services/accent_rules.dart';
@@ -10,7 +11,7 @@ class MetronomeRepositoryImpl implements MetronomeRepository {
   MetronomeRepositoryImpl(this._clickSoundDataSource);
 
   @override
-  Stream<int> start(BeatPattern pattern) async* {
+  Stream<BeatEvent> start(BeatPattern pattern) async* {
     await _clickSoundDataSource.init();
     _isRunning = true;
 
@@ -21,7 +22,7 @@ class MetronomeRepositoryImpl implements MetronomeRepository {
     while (_isRunning) {
       final mode = AccentRules.resolve(currentBeat, pattern);
       await _clickSoundDataSource.playClick(mode: mode);
-      yield currentBeat;
+      yield BeatEvent(beatNumber: currentBeat, mode: mode);
 
       nextTick = nextTick.add(Duration(milliseconds: intervalMs));
       final delay = nextTick.difference(DateTime.now());

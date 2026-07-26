@@ -66,6 +66,7 @@ class _MetronomeView extends StatelessWidget {
   }
 
   BeatPattern _patternFromState(MetronomeState state) {
+    if (state is MetronomeRunning) return state.pattern;
     if (state is MetronomeIdle) return state.pattern;
     return const BeatPattern(bpm: 120, beatsPerBar: 4);
   }

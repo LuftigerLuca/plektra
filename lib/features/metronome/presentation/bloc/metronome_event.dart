@@ -31,3 +31,8 @@ class MetronomeBeatModeChanged extends MetronomeEvent {
   final BeatMode mode;
   MetronomeBeatModeChanged(this.beatNumber, this.mode);
 }
+
+class MetronomeErrorEvent extends MetronomeEvent {
+  final String message;
+  MetronomeErrorEvent(this.message);
+}
