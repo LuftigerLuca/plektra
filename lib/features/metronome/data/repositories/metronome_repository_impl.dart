@@ -23,7 +23,7 @@ class MetronomeRepositoryImpl implements MetronomeRepository {
       await _clickSoundDataSource.playClick(isAccented: isAccented);
       yield currentBeat;
 
-      nextTick = nextTick.add(Duration(microseconds: intervalMs));
+      nextTick = nextTick.add(Duration(milliseconds: intervalMs));
       final delay = nextTick.difference(DateTime.now());
       if (delay > Duration.zero) {
         await Future.delayed(delay);
